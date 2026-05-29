@@ -220,6 +220,7 @@ function showModal(title, text, onConfirm) {
 
 // ==================== 页面切换 ====================
 function switchPage(page) {
+  state.currentPage = page;
   dom.pages.forEach(p => p.classList.remove('active'));
   dom.tabs.forEach(t => t.classList.remove('active'));
 

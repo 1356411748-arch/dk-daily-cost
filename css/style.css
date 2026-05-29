@@ -42,6 +42,15 @@ html, body {
 input, textarea, select {
   font-family: inherit;
   font-size: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 防止 iOS 上 user-select: none 阻塞输入框获得焦点 */
+.add-overlay input,
+.add-overlay textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ========== App 容器 ========== */
