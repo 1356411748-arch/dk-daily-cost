@@ -46,7 +46,7 @@
       </div>
 
       <!-- 预算进度条 -->
-      <div class="budget-section">
+      <div class="budget-section" id="budget-section">
         <div class="budget-header">
           <span class="budget-label">📊 预算</span>
           <span class="budget-numbers">
@@ -55,7 +55,7 @@
           </span>
         </div>
         <div class="budget-bar">
-          <div class="budget-fill" id="budget-fill" style="width:0%"></div>
+          <div class="budget-fill" id="budget-fill" style="transform:scaleX(0);"></div>
         </div>
       </div>
 
@@ -109,7 +109,10 @@
         <div class="settings-header">预算</div>
         <div class="settings-item">
           <span class="settings-label"><span class="settings-icon">💰</span> 月预算</span>
-          <input type="number" class="settings-input" id="budget-input" min="0" step="100" placeholder="5000">
+          <div class="settings-input-group">
+            <input type="number" class="settings-input" id="budget-input" min="0" step="100" placeholder="5000">
+            <button class="settings-btn btn-primary" id="budget-save-btn">保存</button>
+          </div>
         </div>
       </div>
 

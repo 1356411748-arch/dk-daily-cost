@@ -76,6 +76,8 @@ function cacheDom() {
   dom.legendList = $('#legend-list');
 
   dom.budgetInput = $('#budget-input');
+  dom.budgetSaveBtn = $('#budget-save-btn');
+  dom.budgetSection = $('#budget-section');
   dom.exportBtn = $('#export-btn');
   dom.clearBtn = $('#clear-btn');
 
@@ -262,8 +264,10 @@ function renderHome() {
   // 预算
   const budget = state.settings.monthlyBudget || 5000;
   const pct = budget > 0 ? Math.min(total / budget * 100, 100) : 0;
-  dom.budgetFill.style.width = pct + '%';
-  dom.budgetFill.className = 'budget-fill' + (pct >= 100 ? ' danger' : pct >= 80 ? ' warning' : '');
+  dom.budgetFill.style.transform = `scaleX(${pct / 100})`;
+  dom.budgetFill.classList.remove('danger', 'warning');
+  if (pct >= 100) dom.budgetFill.classList.add('danger');
+  else if (pct >= 80) dom.budgetFill.classList.add('warning');
   dom.budgetUsed.textContent = `¥${formatMoney(total)}`;
   dom.budgetTotal.textContent = `/ ¥${formatMoney(budget)}`;
 
@@ -291,10 +295,7 @@ function renderHome() {
       const icon = cat ? cat.icon : '📦';
       html += `
         <div class="record-item-wrap" data-id="${item.id}">
-          <div class="record-item"
-            ontouchstart="Swipe.onTouchStart(event)"
-            ontouchmove="Swipe.onTouchMove(event)"
-            ontouchend="Swipe.onTouchEnd(event)">
+          <div class="record-item">
             <div class="record-icon">${icon}</div>
             <div class="record-info">
               <div class="record-category">${item.subCategory}</div>
@@ -302,7 +303,7 @@ function renderHome() {
             </div>
             <div class="record-amount">¥${formatMoney(item.amount)}</div>
           </div>
-          <button class="delete-btn" onclick="Swipe.onDelete('${item.id}')">删除</button>
+          <button class="delete-btn" data-id="${item.id}">删除</button>
         </div>`;
     });
     html += '</div>';
@@ -310,40 +311,10 @@ function renderHome() {
   dom.recordList.innerHTML = html;
 }
 
-// ==================== 滑动删除 ====================
-const Swipe = {
+// ==================== 滑动删除（事件委托） ====================
+const SwipeState = {
   startX: 0,
   currentEl: null,
-
-  onTouchStart(e) {
-    this.startX = e.touches[0].clientX;
-    this.currentEl = e.currentTarget.closest('.record-item-wrap');
-    document.querySelectorAll('.record-item-wrap.show-delete').forEach(el => {
-      if (el !== this.currentEl) el.classList.remove('show-delete');
-    });
-  },
-
-  onTouchMove(e) {
-    if (!this.currentEl) return;
-    const dx = this.startX - e.touches[0].clientX;
-    if (dx > 40) {
-      this.currentEl.classList.add('show-delete');
-    } else if (dx < 10) {
-      this.currentEl.classList.remove('show-delete');
-    }
-  },
-
-  onTouchEnd() {
-    this.currentEl = null;
-  },
-
-  onDelete(id) {
-    showModal('删除记录', '确定要删除这条记录吗？', () => {
-      deleteRecord(id);
-      renderHome();
-      showToast('已删除');
-    });
-  }
 };
 
 // ==================== 新增记录 ====================
@@ -512,97 +483,112 @@ function renderStats() {
   });
   dom.legendList.innerHTML = legendHtml;
 
-  // 饼图
-  if (pieChartInstance) { pieChartInstance.destroy(); }
-  pieChartInstance = new Chart(dom.pieChart, {
-    type: 'doughnut',
-    data: {
-      labels: catEntries.map(e => e[0]),
-      datasets: [{
-        data: catEntries.map(e => e[1]),
-        backgroundColor: CHART_COLORS.slice(0, catEntries.length),
-        borderWidth: 0,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '55%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = ctx.raw;
-              const pct = ((val / total) * 100).toFixed(1);
-              return ` ${ctx.label}: ¥${formatMoney(val)} (${pct}%)`;
+  // ---- 饼图（复用实例，更新数据） ----
+  const pieLabels = catEntries.map(e => e[0]);
+  const pieData = catEntries.map(e => e[1]);
+  const pieColors = CHART_COLORS.slice(0, catEntries.length);
+
+  if (pieChartInstance) {
+    pieChartInstance.data.labels = pieLabels;
+    pieChartInstance.data.datasets[0].data = pieData;
+    pieChartInstance.data.datasets[0].backgroundColor = pieColors;
+    pieChartInstance.update('none');
+  } else {
+    pieChartInstance = new Chart(dom.pieChart, {
+      type: 'doughnut',
+      data: {
+        labels: pieLabels,
+        datasets: [{
+          data: pieData,
+          backgroundColor: pieColors,
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.raw;
+                const pct = ((val / total) * 100).toFixed(1);
+                return ` ${ctx.label}: ¥${formatMoney(val)} (${pct}%)`;
+              }
             }
           }
         }
       }
-    }
-  });
+    });
+  }
 
-  // ---- 每日趋势折线图 ----
-  if (lineChartInstance) { lineChartInstance.destroy(); }
+  // ---- 每日趋势折线图（复用实例，更新数据） ----
   const dayTotals = {};
   records.forEach(r => {
     const d = parseInt(r.date.split('-')[2]);
     dayTotals[d] = (dayTotals[d] || 0) + r.amount;
   });
-  const labels = [];
-  const values = [];
+  const lineLabels = [];
+  const lineValues = [];
   for (let d = 1; d <= daysInMonth; d++) {
-    labels.push(d + '日');
-    values.push(dayTotals[d] || 0);
+    lineLabels.push(d + '日');
+    lineValues.push(dayTotals[d] || 0);
   }
 
-  lineChartInstance = new Chart(dom.lineChart, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '每日支出',
-        data: values,
-        borderColor: '#FF6B35',
-        backgroundColor: 'rgba(255,107,53,0.08)',
-        fill: true,
-        tension: 0.35,
-        pointRadius: 3,
-        pointBackgroundColor: '#FF6B35',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        borderWidth: 2.5,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` ¥${formatMoney(ctx.raw)}`
-          }
-        }
+  if (lineChartInstance) {
+    lineChartInstance.data.labels = lineLabels;
+    lineChartInstance.data.datasets[0].data = lineValues;
+    lineChartInstance.update('none');
+  } else {
+    lineChartInstance = new Chart(dom.lineChart, {
+      type: 'line',
+      data: {
+        labels: lineLabels,
+        datasets: [{
+          label: '每日支出',
+          data: lineValues,
+          borderColor: '#FF6B35',
+          backgroundColor: 'rgba(255,107,53,0.08)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#FF6B35',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          borderWidth: 2.5,
+        }]
       },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 10 }, color: '#AEAEB2', maxTicksLimit: 10 }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ¥${formatMoney(ctx.raw)}`
+            }
+          }
         },
-        y: {
-          beginAtZero: true,
-          grid: { color: 'rgba(0,0,0,0.04)' },
-          ticks: {
-            font: { size: 10 },
-            color: '#AEAEB2',
-            callback: (v) => '¥' + v
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 10 }, color: '#AEAEB2', maxTicksLimit: 10 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,0,0,0.04)' },
+            ticks: {
+              font: { size: 10 },
+              color: '#AEAEB2',
+              callback: (v) => '¥' + v
+            }
           }
         }
       }
-    }
-  });
+    });
+  }
 }
 
 function statsPrevMonth() {
@@ -726,20 +712,88 @@ function bindEvents() {
   // 保存
   dom.addSave.addEventListener('click', onSave);
 
-  // 月份切换
-  dom.monthPrev.addEventListener('click', prevMonth);
-  dom.monthNext.addEventListener('click', nextMonth);
-  dom.statsPrev.addEventListener('click', statsPrevMonth);
-  dom.statsNext.addEventListener('click', statsNextMonth);
+  // 月份切换（带节流）
+  let monthThrottle = false;
+  function throttledMonth(fn) {
+    return () => {
+      if (monthThrottle) return;
+      monthThrottle = true;
+      fn();
+      setTimeout(() => { monthThrottle = false; }, 300);
+    };
+  }
+  dom.monthPrev.addEventListener('click', throttledMonth(prevMonth));
+  dom.monthNext.addEventListener('click', throttledMonth(nextMonth));
+  dom.statsPrev.addEventListener('click', throttledMonth(statsPrevMonth));
+  dom.statsNext.addEventListener('click', throttledMonth(statsNextMonth));
 
-  // 设置 - 预算
+  // ---- 设置 ----
+  // 预算：输入时自动保存（change 事件）
   dom.budgetInput.addEventListener('change', saveBudget);
+  // 新增：显式保存按钮
+  dom.budgetSaveBtn.addEventListener('click', saveBudget);
+  // 按回车保存
+  dom.budgetInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBudget();
+  });
+
+  // 首页预算区域点击跳转到设置
+  if (dom.budgetSection) {
+    dom.budgetSection.addEventListener('click', () => {
+      switchPage('settings');
+      setTimeout(() => {
+        dom.budgetInput.focus();
+        dom.budgetInput.select();
+      }, 150);
+    });
+  }
 
   // 设置 - 导出
   dom.exportBtn.addEventListener('click', exportData);
 
   // 设置 - 清空
   dom.clearBtn.addEventListener('click', clearAllData);
+
+  // ---- 左滑删除（事件委托） ----
+  let swipeStartX = 0, swipeCurrentEl = null;
+
+  dom.recordList.addEventListener('touchstart', (e) => {
+    const wrap = e.target.closest('.record-item-wrap');
+    if (!wrap) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeCurrentEl = wrap;
+
+    // 关闭其他已展开的删除按钮
+    dom.recordList.querySelectorAll('.record-item-wrap.show-delete').forEach(el => {
+      if (el !== swipeCurrentEl) el.classList.remove('show-delete');
+    });
+  }, { passive: true });
+
+  dom.recordList.addEventListener('touchmove', (e) => {
+    if (!swipeCurrentEl) return;
+    const dx = swipeStartX - e.touches[0].clientX;
+    if (dx > 40) {
+      swipeCurrentEl.classList.add('show-delete');
+    } else if (dx < 10) {
+      swipeCurrentEl.classList.remove('show-delete');
+    }
+  }, { passive: true });
+
+  dom.recordList.addEventListener('touchend', () => {
+    swipeCurrentEl = null;
+  }, { passive: true });
+
+  // 删除按钮点击（事件委托）
+  dom.recordList.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('.delete-btn');
+    if (!delBtn) return;
+    const id = delBtn.dataset.id;
+    showModal('删除记录', '确定要删除这条记录吗？', () => {
+      deleteRecord(id);
+      renderHome();
+      showToast('已删除');
+    });
+  });
 
   // 弹窗背景关闭
   dom.modal.addEventListener('click', (e) => {

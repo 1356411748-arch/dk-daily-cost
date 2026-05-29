@@ -35,22 +35,30 @@ html, body {
   color: var(--text-primary);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  user-select: none;
-  -webkit-user-select: none;
+  /* user-select none 移至 .app-container，避免阻塞 iOS 输入框聚焦 */
 }
 
-input, textarea, select {
+input, textarea, select, [contenteditable] {
   font-family: inherit;
   font-size: inherit;
   user-select: text;
   -webkit-user-select: text;
 }
 
-/* 防止 iOS 上 user-select: none 阻塞输入框获得焦点 */
-.add-overlay input,
-.add-overlay textarea {
-  user-select: text;
-  -webkit-user-select: text;
+/* 应用容器 - 不使用 user-select: none，避免 iOS 输入框聚焦 Bug */
+/* user-select: none 只应用于不需要文字选择的导航栏等组件 */
+
+/* 底部导航栏禁止文字选中 */
+.tab-bar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 新增记录头部和键盘禁止文字选中 */
+.add-header,
+.num-keyboard {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ========== App 容器 ========== */
@@ -76,6 +84,8 @@ input, textarea, select {
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .status-bar .page-title {
@@ -256,6 +266,13 @@ input, textarea, select {
   margin-bottom: 16px;
   box-shadow: var(--shadow);
   flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.budget-section:active {
+  transform: scale(0.98);
 }
 
 .budget-section .budget-header {
@@ -296,8 +313,9 @@ input, textarea, select {
   height: 100%;
   border-radius: 4px;
   background: linear-gradient(90deg, var(--primary-light), var(--primary));
-  transition: width 0.5s ease;
-  min-width: 0;
+  transition: transform 0.5s ease;
+  transform-origin: left center;
+  will-change: transform;
 }
 
 .budget-bar .budget-fill.warning {
@@ -823,8 +841,14 @@ input, textarea, select {
   text-align: center;
 }
 
+.settings-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settings-input {
-  width: 120px;
+  width: 110px;
   padding: 8px 12px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
@@ -838,6 +862,10 @@ input, textarea, select {
 
 .settings-input:focus {
   border-color: var(--primary);
+}
+
+.settings-input-group .btn-primary {
+  white-space: nowrap;
 }
 
 .settings-btn {
