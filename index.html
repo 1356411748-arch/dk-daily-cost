@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DK记账">
+  <meta name="theme-color" content="#FF6B35">
+  <meta name="description" content="简洁易用的日常开销记录工具">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons.svg">
+  <link rel="icon" href="./icons.svg" type="image/svg+xml">
+  <title>DK日常开销</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ===== 顶部栏 ===== -->
+    <div class="status-bar">
+      <div class="month-nav" id="home-nav">
+        <button class="nav-btn" id="month-prev">‹</button>
+        <span class="month-label" id="month-year"></span>
+        <button class="nav-btn" id="month-next">›</button>
+      </div>
+      <div class="page-title" id="page-title" style="display:none;">设置</div>
+    </div>
+
+    <!-- ===== 首页 ===== -->
+    <div class="page active" id="page-home">
+
+      <!-- 汇总卡片 -->
+      <div class="summary-card">
+        <div class="summary-header">
+          <span class="summary-label">本月支出</span>
+          <span class="summary-label" id="summary-count">0笔</span>
+        </div>
+        <div class="summary-amount">
+          <span class="currency">¥</span><span id="summary-amount">0.00</span>
+        </div>
+        <div class="summary-stats">
+          <div class="stat-item">日均 <strong id="summary-daily">¥0</strong></div>
+        </div>
+      </div>
+
+      <!-- 预算进度条 -->
+      <div class="budget-section">
+        <div class="budget-header">
+          <span class="budget-label">📊 预算</span>
+          <span class="budget-numbers">
+            <span class="used" id="budget-used">¥0</span>
+            <span class="total" id="budget-total">/ ¥5,000</span>
+          </span>
+        </div>
+        <div class="budget-bar">
+          <div class="budget-fill" id="budget-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- 记录列表 -->
+      <div id="record-list"></div>
+    </div>
+
+    <!-- ===== 统计页 ===== -->
+    <div class="page" id="page-stats">
+      <div class="status-bar" style="background:transparent;padding:0 0 12px;">
+        <div class="month-nav">
+          <button class="nav-btn" id="stats-prev">‹</button>
+          <span class="month-label" id="stats-month"></span>
+          <button class="nav-btn" id="stats-next">›</button>
+        </div>
+      </div>
+
+      <!-- 统计摘要 -->
+      <div class="stats-summary">
+        <div class="stat-box">
+          <div class="stat-box-value" id="stats-total">¥0</div>
+          <div class="stat-box-label">总支出</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-value" id="stats-avg">¥0</div>
+          <div class="stat-box-label">日均支出</div>
+        </div>
+      </div>
+
+      <!-- 饼图 -->
+      <div class="stats-card">
+        <div class="stats-title">📊 分类占比</div>
+        <div class="chart-container">
+          <canvas id="pie-chart"></canvas>
+        </div>
+        <div class="legend-list" id="legend-list"></div>
+      </div>
+
+      <!-- 折线图 -->
+      <div class="stats-card">
+        <div class="stats-title">📈 每日趋势</div>
+        <div class="chart-container line-chart">
+          <canvas id="line-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 设置页 ===== -->
+    <div class="page" id="page-settings" style="padding-top:16px;">
+      <div class="settings-section">
+        <div class="settings-header">预算</div>
+        <div class="settings-item">
+          <span class="settings-label"><span class="settings-icon">💰</span> 月预算</span>
+          <input type="number" class="settings-input" id="budget-input" min="0" step="100" placeholder="5000">
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-header">数据</div>
+        <div class="settings-item">
+          <span class="settings-label"><span class="settings-icon">📤</span> 导出数据</span>
+          <button class="settings-btn btn-primary" id="export-btn">导出 CSV</button>
+        </div>
+        <div class="settings-item" style="border-bottom:none;">
+          <span class="settings-label"><span class="settings-icon">🗑️</span> 清空所有数据</span>
+          <button class="settings-btn btn-danger" id="clear-btn">清空</button>
+        </div>
+      </div>
+
+      <div class="settings-about">
+        <div class="app-name">DK日常开销</div>
+        <div class="app-version" id="app-version">Version 1.0</div>
+      </div>
+    </div>
+
+    <!-- ===== 底部导航栏 ===== -->
+    <div class="tab-bar">
+      <button class="tab-item active">
+        <span class="tab-icon">📋</span>
+        <span>账单</span>
+      </button>
+      <button class="tab-add">+</button>
+      <button class="tab-item">
+        <span class="tab-icon">📊</span>
+        <span>统计</span>
+      </button>
+      <button class="tab-item">
+        <span class="tab-icon">⚙️</span>
+        <span>设置</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 新增记录（全屏覆盖层） ===== -->
+  <div class="add-overlay" id="add-overlay">
+    <div class="add-header">
+      <button class="add-close" id="add-close">✕</button>
+      <span class="add-title">记一笔</span>
+      <button class="add-save" id="add-save" disabled>保存</button>
+    </div>
+
+    <div class="amount-display">
+      <div class="amount-text" id="amount-text">
+        <span class="amount-currency">¥</span><span class="amount-placeholder">0.00</span>
+      </div>
+    </div>
+
+    <!-- 数字键盘 -->
+    <div class="num-keyboard" id="num-keyboard">
+      <button class="num-key" data-key="1">1</button>
+      <button class="num-key" data-key="2">2</button>
+      <button class="num-key" data-key="3">3</button>
+      <button class="num-key" data-key="4">4</button>
+      <button class="num-key" data-key="5">5</button>
+      <button class="num-key" data-key="6">6</button>
+      <button class="num-key" data-key="7">7</button>
+      <button class="num-key" data-key="8">8</button>
+      <button class="num-key" data-key="9">9</button>
+      <button class="num-key" data-key=".">.</button>
+      <button class="num-key key-zero" data-key="0">0</button>
+      <button class="num-key key-delete" data-key="delete">⌫</button>
+    </div>
+
+    <!-- 分类和表单 -->
+    <div class="add-form">
+      <div class="form-section">
+        <div class="form-label">选择分类</div>
+        <div class="category-grid" id="category-grid"></div>
+      </div>
+      <div class="form-section">
+        <div class="form-label">具体类别</div>
+        <div class="subcat-row" id="subcat-row">
+          <span style="color:var(--text-light);font-size:13px;">请先选择分类</span>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-label">日期</div>
+        <input type="date" class="form-input date-input" id="add-date">
+      </div>
+      <div class="form-section">
+        <div class="form-label">备注（选填）</div>
+        <input type="text" class="form-textarea" id="add-note" placeholder="例如：中午请客户吃饭" maxlength="50">
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Toast 提示 ===== -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ===== 确认弹窗 ===== -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">确认</div>
+      <div class="modal-text" id="modal-text">确定要执行此操作吗？</div>
+      <div class="modal-buttons">
+        <button class="modal-cancel" id="modal-cancel">取消</button>
+        <button class="modal-confirm" id="modal-confirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 脚本 ===== -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="./js/app.js"></script>
+
+</body>
+</html>

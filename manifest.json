@@ -1,0 +1,18 @@
+{
+  "name": "DK日常开销",
+  "short_name": "DK记账",
+  "description": "简洁易用的日常开销记录工具",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF6B35",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
